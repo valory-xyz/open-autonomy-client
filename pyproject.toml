@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "open-autonomy-client"
+version = "0.0.1"
+description = "Autonomous Service Client SDK"
+authors = ["Yuri (solarw) Turchenkov <solarw.mail@gmail.com>"]
+readme = "README.md"
+packages = [{include = "open_autonomy_client"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+tomte = {extras = ["black", "isort", "tests"], version = "^0.2.2"}
+tox = "^4.4.5"
+pytest-asyncio = "^0.20.3"
+eth-account = "^0.8.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
