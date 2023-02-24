@@ -22,9 +22,13 @@ demo_urls = [
     "downloader_class",
     [SimpleDownloader, AllInParallelDownloader, SomeFirstDownloader, SmartDownloader],
 )
-async def test_downloader(downloader_class: Callable):
+async def test_downloader_real_links(downloader_class: Callable):
     dl = downloader_class()
     await dl.download(demo_urls)
+
+
+async def test_smart_downloader():
+    pass
 
 
 if __name__ == "__main__":

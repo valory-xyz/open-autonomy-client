@@ -5,9 +5,9 @@ from typing import Any, Dict, List
 from eth_account._utils.signing import to_standard_signature_bytes
 from eth_account.datastructures import HexBytes
 from eth_keys.main import Signature
-from open_autonomy_client.downloader import (
-    SmartDownloader,
-)
+
+from open_autonomy_client.downloader import SmartDownloader
+
 
 class SignatureChecker:
     hash_algo = sha256
@@ -20,7 +20,7 @@ class SignatureChecker:
         recovered_key_address = signature.recover_public_key_from_msg_hash(
             data_hash
         ).to_checksum_address()
-        assert recovered_key_address == key_addr
+        assert recovered_key_address.lower() == key_addr.lower()
 
     @classmethod
     def _load_key(cls, key_str):
@@ -52,7 +52,7 @@ class Client:
         if bad:
             raise ValueError(f"Downloads errors: {bad}")
         return good
-    
+
     def _check_signatures(self, urls_data: Dict[str, str]) -> None:
         """Raises exception if something wrong"""
         for url, data in urls_data.items():
