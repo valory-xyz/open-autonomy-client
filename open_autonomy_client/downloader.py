@@ -1,5 +1,4 @@
 import asyncio
-import random
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager, suppress
 from typing import Dict, List, Tuple, Union
@@ -8,25 +7,54 @@ import aiohttp
 
 
 class BaseDownloader(ABC):
+    """Base downloader class with basic utility methods."""
+
     async def _download_from_url(self, url: str) -> Union[Dict, Exception]:
+        """
+        Download data from url.
+
+        :param url: str
+
+        :return: json decoded dict or exception instance
+        """
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as resp:
+                    resp.raise_for_status()
                     body = await resp.json()
             return body
         except Exception as e:
             return e
 
-    def is_good_response(self, resp: Union[Exception, Dict]) -> bool:
+    @classmethod
+    def is_good_response(cls, resp: Union[Exception, Dict]) -> bool:
+        """
+        Check response is not exception instance.
+
+        :param resp: dict or exception
+
+        :return: bool
+        """
         return not isinstance(resp, BaseException)
 
+    @classmethod
     def filter_responses(
-        self, url_responses: Dict[str, Union[Dict, Exception]]
+        cls, url_responses: Dict[str, Union[Dict, Exception]]
     ) -> Tuple[Dict[str, Union[Dict, Exception]], Dict[str, Union[Dict, Exception]]]:
+        """
+        Filter resposnes from url.
+
+        Returns two dicts: one with url: dict for good responses
+        another one urls and exceptions
+
+        :param url_responses: dcit with url and responses
+
+        :return: (dict[str, dict], dict[str, exception])
+        """
         good = {}
         bad = {}
         for url, resp in url_responses.items():
-            if self.is_good_response(resp):
+            if cls.is_good_response(resp):
                 good[url] = resp
             else:
                 bad[url] = resp
@@ -34,16 +62,41 @@ class BaseDownloader(ABC):
 
     @abstractmethod
     async def download(self, urls: List[str]) -> Dict[str, Union[Dict, Exception]]:
+        """
+        Download data from urls.
+
+        :param urls: list of url strings
+
+        :return: dict of urls and responses(dict or json)
+        """
         raise NotImplementedError
 
 
 class SimpleDownloader(BaseDownloader):
+    """Simple downloader, loads data sequentially."""
+
     async def download(self, urls: List[str]) -> Dict[str, Union[Dict, Exception]]:
+        """
+        Download data from urls.
+
+        :param urls: list of url strings
+
+        :return: dict of urls and responses(dict or json)
+        """
         return {url: await self._download_from_url(url) for url in urls}
 
 
 class AllInParallelDownloader(BaseDownloader):
+    """Download all urls in parallel.."""
+
     async def download(self, urls: List[str]) -> Dict[str, Union[Dict, Exception]]:
+        """
+        Download data from urls.
+
+        :param urls: list of url strings
+
+        :return: dict of urls and responses(dict or json)
+        """
         task_mapping = {}
 
         for url in urls:
@@ -61,6 +114,13 @@ class SomeFirstDownloader(BaseDownloader):
     """Run in parallel return first good."""
 
     async def download(self, urls: List[str]) -> Dict[str, Union[Dict, Exception]]:
+        """
+        Download data from urls.
+
+        :param urls: list of url strings
+
+        :return: dict of urls and responses(dict or json)
+        """
         task_mapping = {}
 
         for url in urls:
@@ -93,6 +153,35 @@ class SomeFirstDownloader(BaseDownloader):
         return good if good else results
 
 
+class _PendingCounter:
+    """Utility to count amount of downloads in pending."""
+
+    def __init__(self) -> None:
+        """Init."""
+        self._counter = 0
+
+    def inc(self) -> None:
+        """Increment counter."""
+        self._counter += 1
+
+    def dec(self) -> None:
+        """
+        Decement counter.
+        :raises ValueError: if counter is going below 0
+        """
+        if self._counter == 0:
+            raise ValueError("counter can not be dec!")
+        self._counter -= 1
+
+    def is_empty(self) -> bool:
+        """
+        Check counter is 0.
+
+        :return: bool
+        """
+        return self._counter == 0
+
+
 class SmartDownloader(BaseDownloader):
     """
     Downloader allows to:
@@ -102,14 +191,35 @@ class SmartDownloader(BaseDownloader):
         * stop on first result - return when the first non error respose downloaded.
     """
 
-    def __init__(self, concurrent_requests: int = 2, stop_on_first_result: bool = True):
+    def __init__(
+        self, concurrent_requests: int = 2, stop_on_first_result: bool = True
+    ) -> None:
+        """Init downloader:
+
+        :param concurrent_requests: int, amount of concurent requests
+        :param stop_on_first_result: bool, wait for the first success download and stop.
+        """
         self._concurrent_requests = concurrent_requests
         self._stop_on_first_result = stop_on_first_result
 
-    async def _worker(self, in_queue: asyncio.Queue, out_queue: asyncio.Queue):
-        """Get url from in queue and put result to out queue"""
+    async def _worker(
+        self,
+        in_queue: asyncio.Queue,
+        out_queue: asyncio.Queue,
+        pending: _PendingCounter,
+    ) -> None:
+        """
+        Get url from in queue and put result to out queue.
+
+        :param in_queue: queue for incoming urls
+        :param out_queue: queue for processed urls
+        :param pending: pending tasks counter.
+
+        :raises asyncio.CancelledError: asyncio.CancelledError
+        """
         while not in_queue.empty():
             url = await in_queue.get()
+            pending.inc()
             try:
                 result = await self._download_from_url(url)
                 await out_queue.put((url, result))
@@ -118,15 +228,25 @@ class SmartDownloader(BaseDownloader):
                 raise
             except Exception as e:
                 await out_queue.put((url, e))
+            finally:
+                pending.dec()
 
     @asynccontextmanager
     async def _workers_ctx(
         self, urls: List[str], num: int = 0
-    ) -> Tuple[asyncio.Queue, asyncio.Queue]:
+    ) -> Tuple[asyncio.Queue, asyncio.Queue, _PendingCounter]:
+        """Set worker context.
+
+        set workers and cleanup on content exit
+
+        :param urls: list of urls
+        :param num: int, amount of workers
+        :yield: in_queue, out_queue, pending_counter.
+        """
         try:
             num = num or len(urls)
             num = min(num, len(urls))
-
+            pending = _PendingCounter()
             in_queue = asyncio.Queue()
             for url in urls:
                 await in_queue.put(url)
@@ -134,15 +254,12 @@ class SmartDownloader(BaseDownloader):
 
             workers = set(
                 [
-                    asyncio.ensure_future(self._worker(in_queue, out_queue))
+                    asyncio.ensure_future(self._worker(in_queue, out_queue, pending))
                     for i in range(num)
                 ]
             )
 
-            yield (
-                in_queue,
-                out_queue,
-            )
+            yield (in_queue, out_queue, pending)
         finally:
             # cancel workers
             for task in workers:
@@ -158,20 +275,34 @@ class SmartDownloader(BaseDownloader):
                     await task
 
     async def download(self, urls: List[str]) -> Dict[str, Union[Dict, Exception]]:
+        """
+        Download data from urls.
+
+        :param urls: list of url strings
+
+        :return: dict of urls and responses(dict or json)
+        """
         results = {}
 
         async with self._workers_ctx(urls, num=self._concurrent_requests) as (
             in_queue,
             out_queue,
+            pending,
         ):
-            while not in_queue.empty():
+            # do while some in in queue or pending urls
+            while not in_queue.empty() or not pending.is_empty():
                 url, result = await out_queue.get()
                 results[url] = result
                 if self._stop_on_first_result and self.is_good_response(result):
                     # got result with non expcetion reponse, stop it
                     break
 
-        # set pending urls to cancelled
+        # get results from cancelled tasks
+        while not out_queue.empty():
+            url, result = await out_queue.get()
+            results[url] = result
+
+        # set remain urls to cancelled
         while not in_queue.empty():
             url = await in_queue.get()
             results[url] = asyncio.CancelledError(
