@@ -164,7 +164,7 @@ class Client:
         :param data: data signature created for.
         """
         SignatureChecker.check(
-            key_str=key_str, signature_str=signature_str, data_str=data
+            key_str=key_str, signature_str=signature_str, data_bytes=data
         )
 
     def _check_payload_the_same(self, urls_data: Dict[str, str]) -> None:
