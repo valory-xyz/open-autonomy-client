@@ -12,28 +12,26 @@ from open_autonomy_client.downloader import SmartDownloader
 
 
 class SignatureChecker:
-    """Signagure checker."""
+    """Signature checker."""
 
     hash_algo = sha256
 
     @classmethod
-    def check(cls, key_str: str, signature_str: str, data_bytes: bytes) -> None:
+    def check(cls, key_addr: str, signature_str: str, data_str: str) -> None:
         """
         Check signature for payload and public key(address) provided.
 
-        :param key_str: str, pub key or agent address
+        :param key_addr: str, pub key or agent address
         :param signature_str: hex encoded signature byte string
-        :param data_bytes: data signature created for.
+        :param data_str: data signature created for.
 
         :raises ValueError: if signature verification failed.
         """
-        key_addr = cls._load_key(key_str)
         signature = cls._load_signature(signature_str)
-        data_hash = cls._get_data_hash(data_bytes)
+        data_hash = cls._get_data_hash(data_str)
         recovered_key_address = signature.recover_public_key_from_msg_hash(
             data_hash
         ).to_checksum_address()
-        recovered_key_address = recovered_key_address.lower()
         if recovered_key_address != key_addr:
             raise ValueError(
                 f"signature verification failed for key: {key_addr}, recovered key is {recovered_key_address}"
@@ -64,15 +62,15 @@ class SignatureChecker:
         return Signature(signature_bytes=signature_bytes_standard)
 
     @classmethod
-    def _get_data_hash(cls, data_bytes: bytes) -> bytes:
+    def _get_data_hash(cls, data_str: str) -> bytes:
         """
         Get data hash for data.
 
-        :param data_bytes: data signature created for.
+        :param data_str: data signature created for.
 
         :return: hash digest in bytes
         """
-        return cls.hash_algo(data_bytes.encode("ascii")).digest()
+        return cls.hash_algo(data_str.encode("ascii")).digest()
 
 
 class Client:
@@ -96,18 +94,8 @@ class Client:
             raise ValueError("Amount of urls and keys has to match!")
 
         self._urls = urls
-        self._keys = self._fix_keys(keys)
+        self._keys = keys
         self._downloader = self._get_downloader(**downloader_kwargs)
-
-    def _fix_keys(self, keys: List[str]) -> List[str]:
-        """
-        Make keys string lower case.
-
-        :param keys: list of pub keys/addresses
-
-        :return: list of strings
-        """
-        return [i.lower() for i in keys]
 
     def _get_downloader(self, **kwargs):
         """
@@ -155,7 +143,7 @@ class Client:
         for key, signature in signatures.items():
             self._verify_signature(key, signature, payload)
 
-    def _verify_signature(self, key_str: str, signature_str: str, data: str) -> None:
+    def _verify_signature(self, key_addr: str, signature_str: str, data: str) -> None:
         """
         Perform signature verification.
 
@@ -164,7 +152,7 @@ class Client:
         :param data: data signature created for.
         """
         SignatureChecker.check(
-            key_str=key_str, signature_str=signature_str, data_bytes=data
+            key_addr, signature_str=signature_str, data_str=data
         )
 
     def _check_payload_the_same(self, urls_data: Dict[str, str]) -> None:
