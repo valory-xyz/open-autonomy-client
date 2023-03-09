@@ -1,3 +1,4 @@
+import json
 from hashlib import sha256
 from typing import List
 from unittest.mock import patch
@@ -40,7 +41,7 @@ async def test_client_data_generated():
     client = Client(urls=urls_list, keys=pub_keys_list)
     with patch.object(client, "_fetch_data_from_urls", return_value=url_data_responses):
         data_fetched = await client.fetch()
-    assert data_fetched == sample_payload
+    assert data_fetched == json.loads(sample_payload)
 
 
 DATA_FROM_AGENT = {
@@ -64,7 +65,7 @@ async def test_client_data_from_agent_example():
     client = Client(urls=urls_list, keys=pub_keys_list)
     with patch.object(client, "_fetch_data_from_urls", return_value=url_data_responses):
         data_fetched = await client.fetch()
-    assert data_fetched == sample_payload
+    assert data_fetched == json.loads(sample_payload)
 
 
 if __name__ == "__main__":
