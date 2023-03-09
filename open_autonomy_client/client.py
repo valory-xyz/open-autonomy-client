@@ -2,7 +2,7 @@ import asyncio
 import json
 from hashlib import sha256
 from itertools import groupby
-from typing import Any, Dict, List, Union
+from typing import Dict, List, Union
 
 from eth_account._utils.signing import to_standard_signature_bytes
 from eth_account.datastructures import HexBytes
