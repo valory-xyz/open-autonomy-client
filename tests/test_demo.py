@@ -10,7 +10,7 @@ staging_pub_keys_list = [
 ]
 
 
-stagin_agents_urls_list = [
+staging_agents_urls_list = [
     f"http://agent-{i}-price-oracle.staging.autonolas.tech"
     for i in range(len(staging_pub_keys_list))
 ]
@@ -19,13 +19,13 @@ stagin_agents_urls_list = [
 @pytest.mark.asyncio
 async def test_client_test_demo_staging():
 
-    client = Client(urls=stagin_agents_urls_list, keys=staging_pub_keys_list)
+    client = Client(urls=staging_agents_urls_list, keys=staging_pub_keys_list)
     data_fetched = await client.fetch()
     assert "estimate" in data_fetched
 
 
 def test_sync_client_test_demo_staging():
-    client = Client(urls=stagin_agents_urls_list, keys=staging_pub_keys_list)
+    client = Client(urls=staging_agents_urls_list, keys=staging_pub_keys_list)
     data_fetched = client.fetch_sync()
     assert "estimate" in data_fetched
 

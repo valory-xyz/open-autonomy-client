@@ -12,7 +12,7 @@ from open_autonomy_client.downloader import SmartDownloader
 
 
 class SignatureChecker:
-    """Signagure checker."""
+    """Signature checker."""
 
     hash_algo = sha256
 
