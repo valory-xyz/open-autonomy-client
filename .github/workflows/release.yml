@@ -1,0 +1,17 @@
+name: Release Flow
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish-pip-packages:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3.3.0
+      - uses: snok/install-poetry@v1.3.3
+      - name: Set PyPI API token
+        run: poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish Client SDK to PyPI
+        run: poetry publish --build --no-interaction -vvv

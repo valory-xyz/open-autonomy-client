@@ -1,6 +1,3 @@
-OPEN_AEA_REPO_PATH := "${OPEN_AEA_REPO_PATH}"
-DEPLOYMENT_TYPE := "${DEPLOYMENT_TYPE}"
-SERVICE_ID := "${SERVICE_ID}"
 PLATFORM_STR := $(shell uname)
 
 .PHONY: clean
@@ -70,9 +67,9 @@ security:
 	tox -p -e safety -e bandit
 	gitleaks detect --report-format json --report-path leak_report
 
-.PHONY: common-checks-1
+.PHONY: common-checks
 common-checks-1:
-	tox -p -e check-copyright -e check-hash -e check-packages
+	tox -p -e check-copyright
 
 
 .PHONY: docs
@@ -85,4 +82,4 @@ test:
 	find . -name ".coverage*" -not -name ".coveragerc" -exec rm -fr "{}" \;
 
 .PHONY: all-checks
-all-checks: clean formatters code-checks security common-checks-1 
+all-checks: clean formatters code-checks security common-checks-1
