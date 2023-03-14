@@ -96,6 +96,7 @@ class ErrorTypes:  # pylint: disable=too-few-public-methods
     START_YEAR_GT_END_YEAR = 2
     END_YEAR_WRONG = 3
     END_YEAR_MISSING = 4
+    UNKNOWN_ERROR = 5
 
 
 def get_modification_date(file: Path) -> datetime:
@@ -195,7 +196,8 @@ def fix_header(check_info: Dict) -> bool:
     copyright_string = ""
     is_update_needed = False
 
-    if check_info["error_code"] in (
+    error_code = check_info.get("error_code", ErrorTypes.UNKNOWN_ERROR)
+    if error_code in (
         ErrorTypes.END_YEAR_WRONG,
         ErrorTypes.END_YEAR_MISSING,
     ):
@@ -205,7 +207,7 @@ def fix_header(check_info: Dict) -> bool:
         )
         is_update_needed = True
 
-    elif check_info["error_code"] == ErrorTypes.START_YEAR_GT_END_YEAR:
+    elif error_code == ErrorTypes.START_YEAR_GT_END_YEAR:
         copyright_string = "#   Copyright {end_year}-{start_year} Valory AG".format(
             start_year=check_info["start_year"],
             end_year=check_info["last_modification"].year,
