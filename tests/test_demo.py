@@ -18,6 +18,10 @@
 #
 # ------------------------------------------------------------------------------
 
+
+"""Tests for the price-oracle demo on staging."""
+
+
 import pytest
 
 from open_autonomy_client.client import Client
@@ -37,14 +41,15 @@ staging_agents_urls_list = [
 
 
 @pytest.mark.asyncio
-async def test_client_test_demo_staging():
-
+async def test_client_test_demo_staging() -> None:
+    """Test the Client with async fetching."""
     client = Client(urls=staging_agents_urls_list, keys=staging_pub_keys_list)
     data_fetched = await client.fetch()
     assert "estimate" in data_fetched
 
 
-def test_sync_client_test_demo_staging():
+def test_sync_client_test_demo_staging() -> None:
+    """Test the Client with sync fetching."""
     client = Client(urls=staging_agents_urls_list, keys=staging_pub_keys_list)
     data_fetched = client.fetch_sync()
     assert "estimate" in data_fetched

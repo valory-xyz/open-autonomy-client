@@ -18,6 +18,10 @@
 #
 # ------------------------------------------------------------------------------
 
+
+"""Tests the downloader."""
+
+
 from typing import Callable
 
 import pytest
@@ -42,13 +46,14 @@ demo_urls = [
     "downloader_class",
     [SimpleDownloader, AllInParallelDownloader, SomeFirstDownloader, SmartDownloader],
 )
-async def test_downloader_real_links(downloader_class: Callable):
-    dl = downloader_class()
-    await dl.download(demo_urls)
+async def test_downloader_real_links(downloader_class: Callable) -> None:
+    """Test the downloader using the demo urls."""
+    downloader = downloader_class()
+    await downloader.download(demo_urls)
 
 
-async def test_smart_downloader():
-    pass
+async def test_smart_downloader() -> None:
+    """Not implemented yet."""
 
 
 if __name__ == "__main__":
