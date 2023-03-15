@@ -138,6 +138,9 @@ jobs:
       - uses: actions/setup-python@v4.5.0
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install tox
+        run: pip install tomte[tox]==0.2.2
+
       - if: matrix.os == 'ubuntu-latest'
         name: Unit tests ubuntu-latest
         run: |
@@ -187,6 +190,8 @@ jobs:
 #      - uses: actions/setup-python@v4.5.0
 #        with:
 #          python-version: ${{ matrix.python-version }}
+#      - name: Install tox
+#        run: pip install tomte[tox]==0.2.2
 #      - name: e2e tests
 #        run: |
 #          tox --develop -e e2e-py${{ matrix.python-version }}-linux -- -m 'e2e'
