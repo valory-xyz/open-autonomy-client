@@ -149,12 +149,12 @@ jobs:
       - if: matrix.os == 'macos-latest'
         name: Unit tests macos-latest
         run: |
-          tox -e packages-py${{ matrix.python-version }}-darwin -- -m 'not e2e'
+          tox -e py${{ matrix.python-version }}-darwin -- -m 'not e2e'
       
       - if: matrix.os == 'windows-latest'
         name: Unit tests windows-latest
         run: |
-          tox -e packages-py${{ matrix.python-version }}-win -- -m 'not e2e'
+          tox -e py${{ matrix.python-version }}-win -- -m 'not e2e'
 
 #      Not supported yet
 #      - if: matrix.os == 'ubuntu-latest'
