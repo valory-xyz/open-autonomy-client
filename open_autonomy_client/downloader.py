@@ -1,3 +1,27 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# ------------------------------------------------------------------------------
+#
+#   Copyright 2023 Valory AG
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+# ------------------------------------------------------------------------------
+
+
+"""Module responsible for downloading the data."""
+
+
 import asyncio
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager, suppress
@@ -9,7 +33,8 @@ import aiohttp
 class BaseDownloader(ABC):
     """Base downloader class with basic utility methods."""
 
-    async def _download_from_url(self, url: str) -> Union[Dict, Exception]:
+    @staticmethod
+    async def _download_from_url(url: str) -> Union[Dict, Exception]:
         """
         Download data from url.
 
@@ -23,8 +48,8 @@ class BaseDownloader(ABC):
                     resp.raise_for_status()
                     body = await resp.json()
             return body
-        except Exception as e:
-            return e
+        except Exception as exc:  # pylint: disable=broad-except
+            return exc
 
     @classmethod
     def is_good_response(cls, resp: Union[Exception, Dict]) -> bool:
@@ -96,6 +121,7 @@ class AllInParallelDownloader(BaseDownloader):
         :param urls: list of url strings
 
         :return: dict of urls and responses(dict or json)
+        :raises ValueError: if there are pending tasks after retrieving the results
         """
         task_mapping = {}
 
@@ -106,7 +132,8 @@ class AllInParallelDownloader(BaseDownloader):
         done, pending = await asyncio.wait(
             task_mapping.keys(), return_when=asyncio.ALL_COMPLETED
         )
-        assert not pending  # TODO: remove, not needed but for sure
+        if pending:  # TODO: remove, not needed but for sure  # pylint: disable=fixme
+            raise ValueError("There are still pending tasks!")
         return {task_mapping[task]: task.result() for task in done}
 
 
@@ -131,7 +158,7 @@ class SomeFirstDownloader(BaseDownloader):
         pending = task_mapping.keys()
 
         while pending:
-            done, pending = await asyncio.wait(
+            done, pending = await asyncio.wait(  # type: ignore
                 pending, return_when=asyncio.FIRST_COMPLETED
             )
             if [task for task in done if self.is_good_response(task.result())]:
@@ -142,12 +169,14 @@ class SomeFirstDownloader(BaseDownloader):
             # pending to stop
             task.cancel()
 
-        for task in task_mapping.keys():
-            url = task_mapping[task]
+        for url, task in task_mapping.items():  # type: ignore
             try:
                 results[url] = await task
-            except (Exception, asyncio.CancelledError) as e:
-                results[url] = e
+            except (  # pylint: disable=broad-except
+                Exception,
+                asyncio.CancelledError,
+            ) as exc:
+                results[url] = exc  # type: ignore
 
         good, _ = self.filter_responses(results)
         return good if good else results
@@ -166,7 +195,8 @@ class _PendingCounter:
 
     def dec(self) -> None:
         """
-        Decement counter.
+        Decrement counter.
+
         :raises ValueError: if counter is going below 0
         """
         if self._counter == 0:
@@ -184,6 +214,8 @@ class _PendingCounter:
 
 class SmartDownloader(BaseDownloader):
     """
+    A smart downloader implementation.
+
     Downloader allows to:
         * concurrent_requests = 1 - download one by one
         * concurrent_requests = 0 - all in parallel
@@ -223,16 +255,16 @@ class SmartDownloader(BaseDownloader):
             try:
                 result = await self._download_from_url(url)
                 await out_queue.put((url, result))
-            except asyncio.CancelledError as e:
-                await out_queue.put((url, e))
+            except asyncio.CancelledError as exc:
+                await out_queue.put((url, exc))
                 raise
-            except Exception as e:
-                await out_queue.put((url, e))
+            except Exception as exc:  # pylint: disable=broad-except
+                await out_queue.put((url, exc))
             finally:
                 pending.dec()
 
-    @asynccontextmanager
-    async def _workers_ctx(
+    @asynccontextmanager  # type: ignore
+    async def _workers_ctx(  # type: ignore
         self, urls: List[str], num: int = 0
     ) -> Tuple[asyncio.Queue, asyncio.Queue, _PendingCounter]:
         """Set worker context.
@@ -243,21 +275,21 @@ class SmartDownloader(BaseDownloader):
         :param num: int, amount of workers
         :yield: in_queue, out_queue, pending_counter.
         """
+        workers = set()
+
         try:
             num = num or len(urls)
             num = min(num, len(urls))
             pending = _PendingCounter()
-            in_queue = asyncio.Queue()
+            in_queue: asyncio.Queue = asyncio.Queue()
             for url in urls:
                 await in_queue.put(url)
-            out_queue = asyncio.Queue()
+            out_queue: asyncio.Queue = asyncio.Queue()  # type: ignore
 
-            workers = set(
-                [
-                    asyncio.ensure_future(self._worker(in_queue, out_queue, pending))
-                    for i in range(num)
-                ]
-            )
+            workers = {
+                asyncio.ensure_future(self._worker(in_queue, out_queue, pending))
+                for _ in range(num)
+            }
 
             yield (in_queue, out_queue, pending)
         finally:
@@ -284,27 +316,27 @@ class SmartDownloader(BaseDownloader):
         """
         results = {}
 
-        async with self._workers_ctx(urls, num=self._concurrent_requests) as (
+        async with self._workers_ctx(urls, num=self._concurrent_requests) as (  # type: ignore
             in_queue,
             out_queue,
             pending,
         ):
             # do while some in in queue or pending urls
-            while not in_queue.empty() or not pending.is_empty():
-                url, result = await out_queue.get()
+            while not in_queue.empty() or not pending.is_empty():  # type: ignore
+                url, result = await out_queue.get()  # type: ignore
                 results[url] = result
                 if self._stop_on_first_result and self.is_good_response(result):
                     # got result with non expcetion reponse, stop it
                     break
 
         # get results from cancelled tasks
-        while not out_queue.empty():
-            url, result = await out_queue.get()
+        while not out_queue.empty():  # type: ignore
+            url, result = await out_queue.get()  # type: ignore
             results[url] = result
 
         # set remain urls to cancelled
-        while not in_queue.empty():
-            url = await in_queue.get()
+        while not in_queue.empty():  # type: ignore
+            url = await in_queue.get()  # type: ignore
             results[url] = asyncio.CancelledError(
                 "cancelled cause first good results recevied"
             )

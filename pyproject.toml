@@ -31,6 +31,7 @@ packages = [{include = "open_autonomy_client"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+aiohttp = "3.7.4.post0"
 eth-account = "^0.8.0"
 
 [tool.poetry.group.dev.dependencies]
@@ -43,3 +44,19 @@ autopep8 = "^2.0.1"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+# for black compatibility
+profile = "black"
+
+[tool.pylint."MESSAGES CONTROL"]
+max-line-length = 120
+
+[[tool.mypy.overrides]]
+module = [
+    "aiohttp.*",
+    "pytest.*",
+    "eth_account.*",
+    "eth_keys.*"
+]
+ignore_missing_imports = true

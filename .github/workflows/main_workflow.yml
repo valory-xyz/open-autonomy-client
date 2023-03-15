@@ -1,0 +1,197 @@
+name: main_workflow
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+
+env:
+  TENDERMINT_IMAGE_VERSION: latest
+
+jobs:
+  lock_check:
+    continue-on-error: False
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        python-version: ["3.10"]
+
+    defaults:
+      run:
+        shell: bash
+
+    timeout-minutes: 18
+
+    steps:
+    - uses: actions/checkout@v3.3.0
+    - uses: actions/setup-python@v4.5.0
+      with:
+        python-version: ${{ matrix.python-version }}
+    - uses: snok/install-poetry@v1.3.3
+    - name: Poetry install requirements and check they can be locked
+      run: poetry install --all-extras --no-interaction -vvv
+
+  check_copyright:
+    continue-on-error: False
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10"]
+
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v3.3.0
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-python@v4.5.0
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run:  |
+        sudo apt-get update --fix-missing
+        sudo apt-get autoremove
+        sudo apt-get autoclean
+        pip install tomte[tox]==0.2.2
+        pip install --user --upgrade setuptools
+    - name: Check copyright
+      run: tox -e check-copyright
+
+  linter_checks:
+    continue-on-error: False
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10"]
+
+    timeout-minutes: 30
+
+    steps:
+    - uses: actions/checkout@v3.3.0
+    - uses: actions/setup-python@v4.5.0
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run:  |
+        sudo apt-get update --fix-missing
+        sudo apt-get autoremove
+        sudo apt-get autoclean
+        pip install tomte[tox]==0.2.2
+        pip install --user --upgrade setuptools
+    - name: Security checks
+      run: |
+        tox -e bandit
+        tox -e safety
+    - name: Code style check
+      run: |
+        tox -e black-check
+        tox -e isort-check
+        tox -e flake8
+        tox -e vulture
+        tox -e darglint
+    - name: Static type check
+      run: tox -e mypy
+    - name: Pylint
+      run: tox -e pylint
+
+  scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3.3.0
+        with:
+          fetch-depth: 0
+      - run: |
+          wget https://github.com/zricethezav/gitleaks/releases/download/v8.10.1/gitleaks_8.10.1_linux_x64.tar.gz && \
+          tar -xzf gitleaks_8.10.1_linux_x64.tar.gz && \
+          sudo install gitleaks /usr/bin && \
+          gitleaks detect --report-format json --report-path leak_report -v
+
+  test:
+    continue-on-error: True
+    needs:
+      - lock_check
+      - check_copyright
+      - linter_checks
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        python-version: [ "3.10"]
+
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v3.3.0
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: actions/setup-python@v4.5.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install tox
+        run: pip install tomte[tox]==0.2.2
+
+      - if: matrix.os == 'ubuntu-latest'
+        name: Unit tests ubuntu-latest
+        run: |
+          tox -e py${{ matrix.python-version }}-linux -- -m 'not e2e'
+
+      - if: matrix.os == 'macos-latest'
+        name: Unit tests macos-latest
+        run: |
+          tox -e py${{ matrix.python-version }}-darwin -- -m 'not e2e'
+      
+      - if: matrix.os == 'windows-latest'
+        name: Unit tests windows-latest
+        run: |
+          tox -e py${{ matrix.python-version }}-win -- -m 'not e2e'
+
+#      Not supported yet
+#      - if: matrix.os == 'ubuntu-latest'
+#        name: Upload coverage to Codecov
+#        uses: codecov/codecov-action@v3.1.1
+#        with:
+#          token: ${{ secrets.CODECOV_TOKEN }}
+#          file: ./coverage.xml
+#          flags: unittests
+#          name: codecov-umbrella
+#          fail_ci_if_error: false
+#
+#  No tests marked as e2e yet
+#  e2e:
+#    continue-on-error: True
+#    needs:
+#      - lock_check
+#      - check_copyright
+#      - linter_checks
+#    runs-on: ${{ matrix.os }}
+#
+#    strategy:
+#      matrix:
+#        os: [ ubuntu-latest ]
+#        python-version: [ "3.10" ]
+#
+#    timeout-minutes: 30
+#
+#    steps:
+#      - uses: actions/checkout@v3.3.0
+#        with:
+#          submodules: recursive
+#      - uses: actions/setup-python@v4.5.0
+#        with:
+#          python-version: ${{ matrix.python-version }}
+#      - name: Install tox
+#        run: pip install tomte[tox]==0.2.2
+#      - name: e2e tests
+#        run: |
+#          tox --develop -e e2e-py${{ matrix.python-version }}-linux -- -m 'e2e'

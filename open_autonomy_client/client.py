@@ -1,8 +1,32 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# ------------------------------------------------------------------------------
+#
+#   Copyright 2023 Valory AG
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+# ------------------------------------------------------------------------------
+
+
+"""The client implementation."""
+
+
 import asyncio
 import json
 from hashlib import sha256
 from itertools import groupby
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 from eth_account._utils.signing import to_standard_signature_bytes
 from eth_account.datastructures import HexBytes
@@ -11,7 +35,7 @@ from eth_keys.main import Signature
 from open_autonomy_client.downloader import SmartDownloader
 
 
-class SignatureChecker:
+class SignatureChecker:  # pylint: disable=too-few-public-methods
     """Signature checker."""
 
     hash_algo = sha256
@@ -80,7 +104,9 @@ class Client:
     Fetch data from multiple agents by http, check signatures.
     """
 
-    def __init__(self, urls: List[str], keys: List[str], **downloader_kwargs) -> None:
+    def __init__(
+        self, urls: List[str], keys: List[str], **downloader_kwargs: Any
+    ) -> None:
         """
         Init client.
 
@@ -97,7 +123,8 @@ class Client:
         self._keys = keys
         self._downloader = self._get_downloader(**downloader_kwargs)
 
-    def _get_downloader(self, **kwargs):
+    @staticmethod
+    def _get_downloader(**kwargs: Any) -> SmartDownloader:
         """
         Get downloader instance.
 
@@ -127,13 +154,13 @@ class Client:
 
         :param urls_data: Dict[str, Dict of json data]
         """
-        for url, data in urls_data.items():
-            self._check_data_signatures(data)
+        for _, data in urls_data.items():
+            self._check_data_signatures(data)  # type: ignore
 
-    def _check_data_signatures(self, data: str):
+    def _check_data_signatures(self, data: str) -> None:
 
-        payload = self._get_payload_from_data(data)
-        signatures = self._get_signatures_from_data(data)
+        payload = self._get_payload_from_data(data)  # type: ignore
+        signatures = self._get_signatures_from_data(data)  # type: ignore
 
         # check signatures keys, match registered keys
         signatures_not_present = set(self._keys) - set(signatures.keys())
@@ -143,17 +170,16 @@ class Client:
         for key, signature in signatures.items():
             self._verify_signature(key, signature, payload)
 
-    def _verify_signature(self, key_addr: str, signature_str: str, data: str) -> None:
+    @staticmethod
+    def _verify_signature(key_addr: str, signature_str: str, data: str) -> None:
         """
         Perform signature verification.
 
-        :param key_str: str, pub key or agent address
+        :param key_addr: str, pub key or agent address
         :param signature_str: hex encoded signature byte string
         :param data: data signature created for.
         """
-        SignatureChecker.check(
-            key_addr, signature_str=signature_str, data_str=data
-        )
+        SignatureChecker.check(key_addr, signature_str=signature_str, data_str=data)
 
     def _check_payload_the_same(self, urls_data: Dict[str, str]) -> None:
         """
@@ -163,20 +189,21 @@ class Client:
 
         :raises ValueError: if payloads differ
         """
-        # TODO: hashes?, but need recalculate manually
+        # TODO: hashes?, but need recalculate manually  # pylint: disable=fixme
         groups = list(
             groupby(
                 sorted(
-                    urls_data.items(), key=lambda x: self._get_payload_from_data(x[1])
+                    urls_data.items(), key=lambda x: self._get_payload_from_data(x[1])  # type: ignore
                 ),
-                key=lambda x: self._get_payload_from_data(x[1]),
+                key=lambda x: self._get_payload_from_data(x[1]),  # type: ignore
             )
         )
         if len(groups) != 1:
             # TODO: show better details with groups of urls
             raise ValueError("payload differs")
 
-    def _get_payload_from_data(self, url_data: Dict) -> str:
+    @staticmethod
+    def _get_payload_from_data(url_data: Dict) -> str:
         """
         Get payload from data.
 
@@ -186,7 +213,8 @@ class Client:
         """
         return url_data["payload"]
 
-    def _get_signatures_from_data(self, url_data: Dict) -> Dict[str, str]:
+    @staticmethod
+    def _get_signatures_from_data(url_data: Dict) -> Dict[str, str]:
         """
         Get sifnatures dict from data.
 
@@ -196,7 +224,8 @@ class Client:
         """
         return url_data["signatures"]
 
-    def _decode_payload(self, payload: str) -> Dict:
+    @staticmethod
+    def _decode_payload(payload: str) -> Dict:
         """
         Decode payload.
 
@@ -213,10 +242,10 @@ class Client:
         :return: dict with service state data
         """
         urls_data = await self._fetch_data_from_urls()
-        self._check_payload_the_same(urls_data)
-        self._check_signatures(urls_data)
+        self._check_payload_the_same(urls_data)  # type: ignore
+        self._check_signatures(urls_data)  # type: ignore
         return self._decode_payload(
-            self._get_payload_from_data(list(urls_data.values())[0])
+            self._get_payload_from_data(list(urls_data.values())[0])  # type: ignore
         )
 
     def fetch_sync(self) -> Dict:
