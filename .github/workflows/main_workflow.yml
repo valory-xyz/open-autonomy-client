@@ -33,7 +33,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - uses: snok/install-poetry@v1.3.3
     - name: Poetry install requirements and check they can be locked
-      run: poetry install --no-interaction
+      run: poetry install --all-extras --no-interaction -vvv
 
   check_copyright:
     continue-on-error: False
