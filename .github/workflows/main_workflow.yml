@@ -62,6 +62,8 @@ jobs:
         pip install --user --upgrade setuptools
     - name: Check copyright
       run: tox -e check-copyright
+    - name: License compatibility check
+      run: tox -e liccheck
 
   linter_checks:
     continue-on-error: False
