@@ -52,11 +52,5 @@ async def test_downloader_real_links(downloader_class: Callable) -> None:
     await downloader.download(demo_urls)
 
 
-@pytest.mark.asyncio
-@pytest.mark.skip("Not implemented yet.")
-async def test_smart_downloader() -> None:
-    """Tests the smart downloader."""
-
-
 if __name__ == "__main__":
     pytest.main([__file__])
