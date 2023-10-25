@@ -45,7 +45,7 @@ class SignatureChecker:  # pylint: disable=too-few-public-methods
         """
         Check signature for payload and public key(address) provided.
 
-        :param key_addr: str, pub key or agent address
+        :param key_addr: str, pub key checksum address
         :param signature_str: hex encoded signature byte string
         :param data_str: data signature created for.
 
